@@ -1,9 +1,9 @@
 # StackOverflow to Yammer posting service
 # Reagan Williams (reagan.williams@microsoft.com) Aug 2014
 
-require 'faraday'
-require 'json'
 require 'sqlite3'
+require 'json'
+require 'faraday'
 
 token_stack = "STACK_TOKEN"
 token_yammer = "YAMMER_TOKEN"
@@ -11,14 +11,47 @@ groupid_yammer = ""
 
 db_filename = "db.sqlite"
 
+#1: Search StackOverflow
+so_search_api = "http://api.stackexchange.com/2.2/search?order=desc&sort=activity&site=stackoverflow&tagged=" 
+so_search_tags = "yammer" # csv list
 
-#response = Faraday.post do |req|
+response = Faraday.get do |req|
+   req.url so_search_api + so_search_tags
+end
+
+questions = JSON.parse(response.body)
+
+h = Hash.new {0}
+
+
+questions['items'].each do |question|
+    question_id = question['question_id']
+    link = question['link']
+    title = question['title']
+
+    print title + "\n"
+
+    if h.has_key?(:question_id)
+        print "skipped question"
+    else
+        print "added question!"
+    end
+
+#    h.store()
+
+ #   h[question['question_id']]
+
+end
+
+
+#2: Search StackOverflow
+# response = Faraday.post do |req|
 #    req.url "https://www.yammer.com/api/v1/shares"
 #    req.headers["Authorization"] = "Bearer " + BearerToken
 #    req.params['attached_objects'] = ["page:585285"]
 #    req.params['shared_with_emails'] = [SharedWithEmails]
 #    req.params['body'] = "WHO"
-#end
+# end
 
 #print response.body 
 
