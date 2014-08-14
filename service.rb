@@ -28,8 +28,6 @@ def search_stackoverflow(endpoint)
             save_to_db(question['question_id'], question['link'], question['title'])
 
         end
-
-        break
     end
 end
 
@@ -44,8 +42,7 @@ def post_to_yammer(group_id, link, title)
       c.params["body"] = title
     end
 
-    #response = conn.post('/api/v1/messages.json')
-    print link + "\n" + title + "\n\n"
+    response = conn.post('/api/v1/messages.json')
 end
 
 # Save Question Metadata to DB
@@ -87,9 +84,5 @@ def pull_existing_questions()
 
 end
 
-
 pull_existing_questions()
-
 search_stackoverflow($config['so_search_api'] + $config['so_search_tags'])
-
-
