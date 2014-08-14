@@ -4,81 +4,92 @@
 require 'sqlite3'
 require 'json'
 require 'faraday'
+require 'yaml'
 
-token_stack = "STACK_TOKEN"
-token_yammer = "YAMMER_TOKEN"
-groupid_yammer = ""
+# Configs
+$config = YAML.load_file("yamoverflow.yml")
 
-db_filename = "db.sqlite"
+# Setup existing questions dataset
+$existing_question_ids = Array.new
 
-#1: Search StackOverflow
-so_search_api = "http://api.stackexchange.com/2.2/search?order=desc&sort=activity&site=stackoverflow&tagged=" 
-so_search_tags = "yammer" # csv list
-
-response = Faraday.get do |req|
-   req.url so_search_api + so_search_tags
-end
-
-questions = JSON.parse(response.body)
-
-h = Hash.new {0}
-
-
-questions['items'].each do |question|
-    question_id = question['question_id']
-    link = question['link']
-    title = question['title']
-
-    print title + "\n"
-
-    if h.has_key?(:question_id)
-        print "skipped question"
-    else
-        print "added question!"
+# Search StackOverflow
+def search_stackoverflow(endpoint)
+    response = Faraday.get do |req|
+       req.url endpoint
     end
 
-#    h.store()
+    questions = JSON.parse(response.body)
 
- #   h[question['question_id']]
+    h = Hash.new
+    questions['items'].each do |question|
+        # write record to database & yammer
+        unless $existing_question_ids.include?(question['question_id'])
+            post_to_yammer($config['yammer_group_id'], question['link'], question['title'])
+            save_to_db(question['question_id'], question['link'], question['title'])
+
+        end
+
+        break
+    end
+end
+
+# Post Message to Yammer
+def post_to_yammer(group_id, link, title)
+    conn = Faraday.new('https://www.yammer.com/') do |c|
+      c.use Faraday::Adapter::NetHttp
+      c.headers["Authorization"] = "Bearer " + $config['yammer_token']
+      c.params["group_id"] = group_id
+      c.params["og_url"] = link
+      c.params["og_fetch"] = true
+      c.params["body"] = title
+    end
+
+    #response = conn.post('/api/v1/messages.json')
+    print link + "\n" + title + "\n\n"
+end
+
+# Save Question Metadata to DB
+def save_to_db(id, link, title)
+    begin
+        db = SQLite3::Database.open $config['db_filename']
+
+        # yes i know this is vuln to titles with sql injections in them :)
+        db.execute "INSERT INTO questions VALUES (" + id.to_s + ", '" + link + "', '" + title + "');"
+
+    rescue SQLite3::Exception => e
+        puts "Exception occured"
+        puts e
+
+    ensure
+        db.close if db
+    end
+end
+
+def pull_existing_questions()
+    begin
+        db = SQLite3::Database.open $config['db_filename']
+        stmt = db.prepare "SELECT question_id FROM questions"
+        rs = stmt.execute
+
+        # I can call rs.to_a here but the records are returned as 1-d arrays in an array
+        rs.each do |row|
+            $existing_question_ids.push row[0]
+        end 
+
+    rescue SQLite3::Exception => e
+        puts "Exception occured"
+        puts e
+
+    ensure
+        stmt.close if stmt
+        db.close if db
+    end
 
 end
 
 
-#2: Search StackOverflow
-# response = Faraday.post do |req|
-#    req.url "https://www.yammer.com/api/v1/shares"
-#    req.headers["Authorization"] = "Bearer " + BearerToken
-#    req.params['attached_objects'] = ["page:585285"]
-#    req.params['shared_with_emails'] = [SharedWithEmails]
-#    req.params['body'] = "WHO"
-# end
+pull_existing_questions()
 
-#print response.body 
-
-# conn = Faraday.new(:url => 'http://yammer.com') do |y|
-#   y.use Faraday::Request::UrlEncoded  # encode request params as "www-form-urlencoded"
-#   y.use Faraday::Response::Logger     # log request & response to STDOUT
-#   y.use Faraday::Adapter::NetHttp     # perform requests with Net::HTTP
-# end
-
-# response = conn.get '/nigiri/sake.json'     # GET http://sushi.com/nigiri/sake.json
-# response.body
-
-# conn.post '/nigiri', { :name => 'Maguro' }  # POST "name=maguro" to http://sushi.com/nigiri
-
-
-
-# begin
-
-#     db = SQLite3::Database.open db_filename
-#     db.execute "INSERT INTO questions VALUES ('111', 'reagan', 'williams');"
-
-# rescue SQLite3::Exception => e
-#     puts "Exception occured"
-#     puts e
-
-# ensure
-#     db.close if db
-# end
+search_stackoverflow($config['so_search_api'] + $config['so_search_tags'])
 
 

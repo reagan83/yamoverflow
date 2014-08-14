@@ -1,0 +1,12 @@
+# YamOverflow configs
+
+db_filename: "db.sqlite"
+
+yammer_token: "YAMMER_TOKEN"
+yammer_group_id: "4644288"
+
+yammer_messages_api: "https://www.yammer.com/api/v1/messages.json"
+so_search_tags: "yammer" # csv list
+so_search_api: "http://api.stackexchange.com/2.2/search?order=desc&sort=activity&site=stackoverflow&tagged="
+
+
